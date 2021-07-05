@@ -125,7 +125,7 @@ func runPod(ctx context.Context, client *kubernetes.Clientset, runCollector *tro
 		}
 		pod.Spec.ImagePullSecrets = append(pod.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: secretName})
 	}
-	created, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+	created, err := client.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create pod")
 	}
