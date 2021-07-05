@@ -116,44 +116,7 @@ func runWithoutTimeout(ctx context.Context, c *Collector, pod *corev1.Pod, runCo
 }
 
 func runPod(ctx context.Context, client *kubernetes.Clientset, runCollector *troubleshootv1beta2.Run, namespace string) (*corev1.Pod, error) {
-	podLabels := make(map[string]string)
-	podLabels["troubleshoot-role"] = "run-collector"
-
-	pullPolicy := corev1.PullIfNotPresent
-	if runCollector.ImagePullPolicy != "" {
-		pullPolicy = corev1.PullPolicy(runCollector.ImagePullPolicy)
-	}
-
-	if namespace == "" {
-		namespace = runCollector.Namespace
-	}
-	if namespace == "" {
-		namespace = "default"
-	}
-
-	pod := corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      runCollector.CollectorName,
-			Namespace: namespace,
-			Labels:    podLabels,
-		},
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Pod",
-		},
-		Spec: corev1.PodSpec{
-			RestartPolicy: corev1.RestartPolicyNever,
-			Containers: []corev1.Container{
-				{
-					Image:           runCollector.Image,
-					ImagePullPolicy: pullPolicy,
-					Name:            "collector",
-					Command:         runCollector.Command,
-					Args:            runCollector.Args,
-				},
-			},
-		},
-	}
+	pod := constructPod(runCollector, namespace)
 
 	if runCollector.ImagePullSecret != nil && runCollector.ImagePullSecret.Data != nil {
 		secretName, err := createSecret(ctx, client, pod.Namespace, runCollector.ImagePullSecret)
@@ -162,12 +125,64 @@ func runPod(ctx context.Context, client *kubernetes.Clientset, runCollector *tro
 		}
 		pod.Spec.ImagePullSecrets = append(pod.Spec.ImagePullSecrets, corev1.LocalObjectReference{Name: secretName})
 	}
-	created, err := client.CoreV1().Pods(namespace).Create(ctx, &pod, metav1.CreateOptions{})
+	created, err := client.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create pod")
 	}
 
 	return created, nil
+}
+
+func constructPod(runCollector *troubleshootv1beta2.Run, namespace string) *corev1.Pod {
+	pod := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+	}
+
+	// If a pod definition was supplied, use that as a base instead.
+	if runCollector.Pod != nil {
+		pod = runCollector.Pod.DeepCopy()
+	}
+
+	// Ensure pod has basic settings.
+	pod.Name = runCollector.CollectorName
+
+	if namespace != "" {
+		pod.Namespace = namespace
+	}
+	if pod.Namespace == "" {
+		pod.Namespace = "default"
+	}
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+	pod.Labels["troubleshoot-role"] = "run-collector"
+
+	pod.Spec.RestartPolicy = corev1.RestartPolicyNever
+
+	// If a Pod definition was supplied, return it without making further changes.
+	if runCollector.Pod != nil {
+		return pod
+	}
+
+	pullPolicy := corev1.PullIfNotPresent
+	if runCollector.ImagePullPolicy != "" {
+		pullPolicy = corev1.PullPolicy(runCollector.ImagePullPolicy)
+	}
+
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Image:           runCollector.Image,
+			ImagePullPolicy: pullPolicy,
+			Name:            "collector",
+			Command:         runCollector.Command,
+			Args:            runCollector.Args,
+		},
+	}
+
+	return pod
 }
 
 func createSecret(ctx context.Context, client *kubernetes.Clientset, namespace string, imagePullSecret *troubleshootv1beta2.ImagePullSecrets) (string, error) {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/replicatedhq/troubleshoot/pkg/multitype"
 	authorizationv1 "k8s.io/api/authorization/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -62,6 +63,7 @@ type Run struct {
 	Timeout         string            `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	ImagePullPolicy string            `json:"imagePullPolicy,omitempty" yaml:"imagePullPolicy,omitempty"`
 	ImagePullSecret *ImagePullSecrets `json:"imagePullSecret,omitempty" yaml:"imagePullSecret,omitempty"`
+	Pod             *corev1.Pod       `json:"pod,omitempty" yaml:"pod,omitempty"`
 }
 
 type ImagePullSecrets struct {
