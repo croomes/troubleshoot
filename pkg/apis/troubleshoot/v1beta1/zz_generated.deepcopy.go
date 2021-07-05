@@ -21,6 +21,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -1410,6 +1411,11 @@ func (in *Run) DeepCopyInto(out *Run) {
 	if in.ImagePullSecret != nil {
 		in, out := &in.ImagePullSecret, &out.ImagePullSecret
 		*out = new(ImagePullSecrets)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Pod != nil {
+		in, out := &in.Pod, &out.Pod
+		*out = new(v1.Pod)
 		(*in).DeepCopyInto(*out)
 	}
 }
